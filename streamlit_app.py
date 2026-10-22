@@ -17,6 +17,7 @@ else:
     st.stop()
 
 # --- FIXED API ROUTING ---
+# Ensure you are hitting the 'api-inference' subdomain, not the base site!
 API_URL = "https://huggingface.co"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 # -------------------------
