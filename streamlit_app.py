@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+from huggingface_hub import InferenceClient
 import time
 
 # 1. Page Configuration
@@ -16,73 +16,55 @@ else:
     st.error("🔑 Token missing! Please paste your 'HF_TOKEN' into your Streamlit App Secrets panel.")
     st.stop()
 
-# --- FIXED PUBLIC SUITE ENDPOINT & HEADERS ---
-# Using an unlocked serverless video/multimodal endpoint pattern
-API_URL = "https://huggingface.co"
-
-headers = {
-    "Authorization": f"Bearer {HF_TOKEN}",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-# ---------------------------------------------
-
 st.title("🎬 Free Cloud AI Video Generator")
-st.write("Hosted on Streamlit Cloud. Operating completely free via Hugging Face Serverless nodes.")
+st.write("Hosted on Streamlit Cloud. Operating via the Hugging Face Client Hub.")
 
 # 3. Simple UI Form Setup
 with st.form("generation_form"):
     prompt = st.text_area(
         "Describe your video scene", 
-        placeholder="An astronaut walking on a neon purple alien planet, crystal structures glowing around them..."
+        placeholder="A majestic golden eagle soaring over snow-capped mountains, cinematic lighting..."
     )
-    negative_prompt = st.text_input("Negative Prompt (Things to exclude)", value="blurry, low quality, static, distorted")
     
     submit_button = st.form_submit_button(label="Generate Video", type="primary")
 
-# 4. Handle form processing when clicked
+# 4. Handle form processing when clicked using the official SDK client
 if submit_button:
     if not prompt:
         st.warning("Please type a descriptive prompt first!")
     else:
-        with st.spinner("🤖 The cloud GPU is processing your request... This takes about 30-60 seconds."):
-            payload = {
-                "inputs": prompt,
-                "parameters": {
-                    "negative_prompt": negative_prompt,
-                    "num_inference_steps": 20,
-                    "guidance_scale": 5.0
-                }
-            }
-            
+        with st.spinner("🤖 Hugging Face Hub is initializing generation... This takes about 30-60 seconds."):
             try:
-                # Send the requests to the serverless endpoint
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+                # Initialize the official client wrapper (bypasses raw HTTP CloudFront blocks)
+                client = InferenceClient(token=HF_TOKEN)
                 
-                # If the serverless node is sleeping, wait 15 seconds and trigger again
-                if response.status_code == 503:
-                    st.info("⏳ Cloud endpoint is waking up on Hugging Face. Automatic retry starting in 15 seconds...")
-                    time.sleep(15)
-                    response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
-
-                if response.status_code == 200:
-                    output_file = "rendered_video.mp4"
-                    # Capture raw file stream and write to server memory
-                    with open(output_file, "wb") as f:
-                        f.write(response.content)
-                    
-                    st.success("🎉 Asset generated successfully!")
-                    st.video(output_file)
-                    
-                    # Provide an immediate download button
-                    with open(output_file, "rb") as file:
-                        st.download_button(
-                            label="📥 Download Video",
-                            data=file,
-                            file_name="ai_video_output.mp4",
-                            mime="video/mp4"
-                        )
-                else:
-                    st.error(f"API Error ({response.status_code}): {response.text}")
+                # Using an open-weights video model fully compatible with the client wrapper
+                # If the server responds that this model is overloaded, the client handles retries natively
+                output_file = "rendered_video.mp4"
+                
+                # Fetching the text-to-video asset through the SDK
+                video_bytes = client.text_to_video(
+                    prompt=prompt,
+                    model="Lightricks/LTX-Video"
+                )
+                
+                # Save the returned binary stream directly into an MP4 file
+                with open(output_file, "wb") as f:
+                    f.write(video_bytes)
+                
+                st.success("🎉 Video generated successfully!")
+                st.video(output_file)
+                
+                # Provide an immediate download button
+                with open(output_file, "rb") as file:
+                    st.download_button(
+                        label="📥 Download Video",
+                        data=file,
+                        file_name="ai_video_output.mp4",
+                        mime="video/mp4"
+                    )
                     
             except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+                # Capture any model-overload or permission messages gracefully
+                st.error(f"Execution Error: {str(e)}")
+                st.info("💡 Tip: If the error mentions 'Model too busy', wait a moment and click generate again.")
