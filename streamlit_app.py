@@ -4,7 +4,7 @@ import time
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="AI Video Generator",
+    page_title="Free Cloud AI Video Generator",
     page_icon="🎬",
     layout="centered"
 )
@@ -16,20 +16,24 @@ else:
     st.error("🔑 Token missing! Please paste your 'HF_TOKEN' into your Streamlit App Secrets panel.")
     st.stop()
 
-# --- FIXED API ROUTING ---
-# Ensure you are hitting the 'api-inference' subdomain, not the base site!
+# --- FIXED PUBLIC SUITE ENDPOINT & HEADERS ---
+# Using an unlocked serverless video/multimodal endpoint pattern
 API_URL = "https://huggingface.co"
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-# -------------------------
 
-st.title("🎬 Cloud AI Video Generator")
-st.write("Write your code on GitHub, host on Streamlit, and run models on the cloud.")
+headers = {
+    "Authorization": f"Bearer {HF_TOKEN}",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+# ---------------------------------------------
+
+st.title("🎬 Free Cloud AI Video Generator")
+st.write("Hosted on Streamlit Cloud. Operating completely free via Hugging Face Serverless nodes.")
 
 # 3. Simple UI Form Setup
 with st.form("generation_form"):
     prompt = st.text_area(
         "Describe your video scene", 
-        placeholder="A majestic whale swimming through a sea of stars and cosmic dust, deep space ambient lighting..."
+        placeholder="An astronaut walking on a neon purple alien planet, crystal structures glowing around them..."
     )
     negative_prompt = st.text_input("Negative Prompt (Things to exclude)", value="blurry, low quality, static, distorted")
     
@@ -40,7 +44,7 @@ if submit_button:
     if not prompt:
         st.warning("Please type a descriptive prompt first!")
     else:
-        with st.spinner("🤖 The cloud GPU is processing your tensors... This takes about 30-60 seconds."):
+        with st.spinner("🤖 The cloud GPU is processing your request... This takes about 30-60 seconds."):
             payload = {
                 "inputs": prompt,
                 "parameters": {
@@ -56,18 +60,20 @@ if submit_button:
                 
                 # If the serverless node is sleeping, wait 15 seconds and trigger again
                 if response.status_code == 503:
-                    st.info("⏳ Cloud endpoint is waking up. Automatic retry starting in 15 seconds...")
+                    st.info("⏳ Cloud endpoint is waking up on Hugging Face. Automatic retry starting in 15 seconds...")
                     time.sleep(15)
                     response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
 
                 if response.status_code == 200:
                     output_file = "rendered_video.mp4"
+                    # Capture raw file stream and write to server memory
                     with open(output_file, "wb") as f:
                         f.write(response.content)
                     
-                    st.success("🎉 Video generated successfully!")
+                    st.success("🎉 Asset generated successfully!")
                     st.video(output_file)
                     
+                    # Provide an immediate download button
                     with open(output_file, "rb") as file:
                         st.download_button(
                             label="📥 Download Video",
